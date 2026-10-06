@@ -149,6 +149,12 @@ function renderReports(reports) {
   }
 }
 
+// 匿名合辑：主持人按姓名的勾选结果独立保存在此集合中。3 秒轮询会整体重绘
+// 合辑表格，但勾选状态以本集合为准恢复——轮询只更新授权与会话状态，不清空选择；
+// 成员撤回授权也不会静默取消勾选（是否可发布仍由服务端按授权整次拒绝）。
+const anthologySelected = new Set();
+let anthologyPublishing = false;
+
 // 匿名合辑：公布后显示各人授权，勾选姓名发布一次；发布后只显示公开链接
 function renderAnthology(s) {
   const section = document.getElementById("anthology-section");
@@ -157,7 +163,8 @@ function renderAnthology(s) {
   const form = document.getElementById("anthology-form");
   const done = document.getElementById("anthology-done");
   if (s.anthology_url) {
-    // 已发布：只展示公开链接（封存后仍可只读访问），不再显示选择表单
+    // 已发布：只展示公开链接（封存后仍可只读访问），不再显示选择表单，停止编辑
+    anthologyPublishing = false;
     form.hidden = true;
     done.hidden = false;
     const a = document.getElementById("anthology-link");
@@ -167,6 +174,12 @@ function renderAnthology(s) {
   }
   form.hidden = false;
   done.hidden = true;
+  // 公布后名单固定（公布前才能移除成员）；仍防御性地剔除已不在名单中的姓名，
+  // 留存成员的勾选结果一律保留，包括授权已被撤回者
+  const currentNames = new Set(s.reviewers.map((r) => r.name));
+  for (const name of anthologySelected) {
+    if (!currentNames.has(name)) anthologySelected.delete(name);
+  }
   const tbody = document.getElementById("anthology-members");
   tbody.innerHTML = "";
   for (const r of s.reviewers) {
@@ -175,7 +188,17 @@ function renderAnthology(s) {
     const cb = document.createElement("input");
     cb.type = "checkbox";
     cb.value = r.name;
-    cb.disabled = !!s.closed;
+    // 勾选状态只来自主持人的本地操作，不随轮询或授权撤回改变
+    cb.checked = anthologySelected.has(r.name);
+    // 封存后禁用选择；发布请求进行中也防止改动
+    cb.disabled = !!s.closed || anthologyPublishing;
+    cb.addEventListener("change", () => {
+      if (cb.checked) {
+        anthologySelected.add(r.name);
+      } else {
+        anthologySelected.delete(r.name);
+      }
+    });
     tdPick.appendChild(cb);
     const tdName = document.createElement("td");
     tdName.textContent = r.name;
@@ -185,13 +208,16 @@ function renderAnthology(s) {
     tr.append(tdPick, tdName, tdConsent);
     tbody.appendChild(tr);
   }
-  document.getElementById("anthology-publish").disabled = !!s.closed;
+  // 封存后禁用发布；空名单仍由点击处理提示，不发请求
+  document.getElementById("anthology-publish").disabled =
+    !!s.closed || anthologyPublishing;
 }
 
-// 发布匿名合辑：按勾选的姓名一次发布；任一入选稿未授权则整次失败
+// 发布匿名合辑：按页面名单顺序收集勾选的姓名一次发布；任一入选稿未授权则整次失败
 document.getElementById("anthology-publish").addEventListener("click", async () => {
   const errorEl = document.getElementById("anthology-error");
   errorEl.textContent = "";
+  // 按页面名单顺序（与 s.reviewers 同序的表格行）取勾选姓名；勾选集合跨轮询保留
   const names = [
     ...document.querySelectorAll("#anthology-members input[type=checkbox]:checked"),
   ].map((cb) => cb.value);
@@ -209,6 +235,13 @@ document.getElementById("anthology-publish").addEventListener("click", async () 
     return;
   const btn = document.getElementById("anthology-publish");
   btn.disabled = true;
+  anthologyPublishing = true;
+  // 请求进行中固定勾选状态，避免轮询重绘产生可点击的新复选框
+  document
+    .querySelectorAll("#anthology-members input[type=checkbox]")
+    .forEach((cb) => {
+      cb.disabled = true;
+    });
   try {
     const r = await fetch("/api/h/" + token + "/anthology", {
       method: "POST",
@@ -217,15 +250,21 @@ document.getElementById("anthology-publish").addEventListener("click", async () 
     });
     const data = await r.json();
     if (!r.ok) {
+      // 失败（如入选稿撤回授权）不清空勾选：保留选择供调整后重试；立即重绘恢复可操作
+      anthologyPublishing = false;
       errorEl.textContent =
         (data.error || "发布失败") +
         (data.missing_consent ? "（未授权：" + data.missing_consent.join("、") + "）" : "");
-      btn.disabled = false;
+      refresh();
       return;
     }
+    // 成功：合辑已发布，勾选名单不再有用，清空并交由轮询切换为只读公开链接
+    anthologySelected.clear();
+    anthologyPublishing = false;
   } catch {
+    anthologyPublishing = false;
     errorEl.textContent = "网络错误，请重试";
-    btn.disabled = false;
+    refresh();
     return;
   }
   refresh();
