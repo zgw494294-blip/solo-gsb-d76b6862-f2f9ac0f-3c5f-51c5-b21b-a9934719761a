@@ -149,7 +149,14 @@ function renderReports(reports) {
   }
 }
 
-// 匿名合辑：公布后显示各人授权，勾选姓名发布一次；发布后只显示公开链接
+// 匿名合辑：公布后显示各人授权，勾选姓名发布一次；发布后只显示公开链接。
+// 勾选结果按姓名保存在 anthologySelection：3 秒轮询重绘名单时据此恢复勾选，
+// 轮询只更新各人授权状态与封存状态，不会清空或改动已勾选/已取消的姓名；
+// 成员撤回授权也不会被从所选名单中静默移除（能否发布由服务端在发布时整次校验）。
+const anthologySelection = new Set();
+// 最近一次渲染的名单顺序（即页面名单顺序）：发布时按此顺序提交勾选的姓名
+let anthologyMemberOrder = [];
+
 function renderAnthology(s) {
   const section = document.getElementById("anthology-section");
   section.hidden = !s.published;
@@ -167,6 +174,13 @@ function renderAnthology(s) {
   }
   form.hidden = false;
   done.hidden = true;
+  const names = s.reviewers.map((r) => r.name);
+  // 只清理已不在名单中的姓名；仍在名单中的勾选一律保留——包括撤回授权的成员：
+  // 撤回只更新其授权显示，不静默缩减所选名单
+  for (const n of [...anthologySelection]) {
+    if (!names.includes(n)) anthologySelection.delete(n);
+  }
+  anthologyMemberOrder = names;
   const tbody = document.getElementById("anthology-members");
   tbody.innerHTML = "";
   for (const r of s.reviewers) {
@@ -175,7 +189,14 @@ function renderAnthology(s) {
     const cb = document.createElement("input");
     cb.type = "checkbox";
     cb.value = r.name;
+    // 轮询重绘：按姓名恢复勾选/取消的结果
+    cb.checked = anthologySelection.has(r.name);
+    // 封存后只读：禁用选择
     cb.disabled = !!s.closed;
+    cb.addEventListener("change", () => {
+      if (cb.checked) anthologySelection.add(r.name);
+      else anthologySelection.delete(r.name);
+    });
     tdPick.appendChild(cb);
     const tdName = document.createElement("td");
     tdName.textContent = r.name;
@@ -185,16 +206,16 @@ function renderAnthology(s) {
     tr.append(tdPick, tdName, tdConsent);
     tbody.appendChild(tr);
   }
+  // 封存后禁用发布
   document.getElementById("anthology-publish").disabled = !!s.closed;
 }
 
-// 发布匿名合辑：按勾选的姓名一次发布；任一入选稿未授权则整次失败
+// 发布匿名合辑：按页面名单顺序提交点击时勾选的姓名；任一入选稿未授权则整次失败，
+// 失败后保留勾选，可调整名单或待授权后重试
 document.getElementById("anthology-publish").addEventListener("click", async () => {
   const errorEl = document.getElementById("anthology-error");
   errorEl.textContent = "";
-  const names = [
-    ...document.querySelectorAll("#anthology-members input[type=checkbox]:checked"),
-  ].map((cb) => cb.value);
+  const names = anthologyMemberOrder.filter((n) => anthologySelection.has(n));
   if (!names.length) {
     errorEl.textContent = "请至少选择一名成员。";
     return;

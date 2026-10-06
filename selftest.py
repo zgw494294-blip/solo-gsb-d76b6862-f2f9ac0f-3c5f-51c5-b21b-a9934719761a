@@ -8,7 +8,10 @@
 
 import logging
 import os
+import shutil
 import sqlite3
+import subprocess
+import sys
 import tempfile
 import threading
 import time
@@ -2721,6 +2724,97 @@ class AnthologyTest(unittest.TestCase):
         )
 
 
+class HostAnthologySelectionFlowTest(unittest.TestCase):
+    """主持页合辑勾选流程的 API 级回归：重复轮询只读且持续反映授权变化、
+    撤回授权后整次发布失败可重试、封存后只读（页面据此禁用选择与发布）。
+
+    前端"勾选结果随 3 秒轮询保留、按页面名单顺序提交"的回归见 selftest_host.js。
+    """
+
+    def setUp(self):
+        self.client = new_client()
+        self.names = ["甲", "乙", "丙"]
+        self.host_token, self.tokens = create_named_session(self.client, self.names)
+        publish_with_reviews(
+            self.client, self.host_token, [self.tokens[n] for n in self.names]
+        )
+
+    def poll(self):
+        """主持页一次 3 秒轮询对应的状态读取。"""
+        return host_state(self.client, self.host_token)
+
+    def test_repeated_polling_is_read_only_and_reflects_consent_updates(self):
+        set_consent(self.client, self.tokens["甲"], True)
+        set_consent(self.client, self.tokens["丙"], True)
+        first = self.poll()
+        self.assertIsNone(first["anthology_url"])
+        # 模拟主持页反复轮询：读取只读，不产生任何变更，响应逐次一致
+        for _ in range(5):
+            self.assertEqual(self.poll(), first)
+        self.assertEqual(
+            [r["anthology_consent"] for r in first["reviewers"]],
+            [True, False, True],
+        )
+        # 轮询持续反映各人授权变化：乙授权后下一次轮询即可见
+        set_consent(self.client, self.tokens["乙"], True)
+        self.assertEqual(
+            [r["anthology_consent"] for r in self.poll()["reviewers"]],
+            [True, True, True],
+        )
+
+    def test_withdraw_then_failed_publish_keeps_state_and_retry_succeeds(self):
+        for n in self.names:
+            set_consent(self.client, self.tokens[n], True)
+        # 入选成员在发布前撤回授权：主持端下一次轮询看到撤回，但页面保留按姓名
+        # 勾选的名单（见 selftest_host.js），发布时仍会提交该姓名
+        set_consent(self.client, self.tokens["丙"], False)
+        self.assertEqual(
+            [r["anthology_consent"] for r in self.poll()["reviewers"]],
+            [True, True, False],
+        )
+        # 服务端整次拒绝并给出未授权名单；不留合辑、授权不变，可调整重试
+        resp = publish_anthology(self.client, self.host_token, ["甲", "乙", "丙"])
+        self.assertEqual(resp.status_code, 409)
+        self.assertEqual(resp.get_json()["missing_consent"], ["丙"])
+        self.assertIsNone(self.poll()["anthology_url"])
+        self.assertEqual(
+            [r["anthology_consent"] for r in self.poll()["reviewers"]],
+            [True, True, False],
+        )
+        # 重新授权后按原名单重试成功：按页面名单（录入）顺序编号固化
+        set_consent(self.client, self.tokens["丙"], True)
+        resp = publish_anthology(self.client, self.host_token, ["甲", "乙", "丙"])
+        self.assertEqual(resp.status_code, 200, resp.get_json())
+        pub = resp.get_json()["url"].rsplit("/", 1)[-1]
+        items = self.client.get(f"/api/a/{pub}").get_json()["items"]
+        self.assertEqual(
+            [(it["number"], it["manuscript"]) for it in items],
+            [(1, "稿甲"), (2, "稿乙"), (3, "稿丙")],
+        )
+        # 发布后主持状态返回公开链接：页面据此停止编辑、只显示链接
+        self.assertEqual(self.poll()["anthology_url"], f"/a/{pub}")
+
+    def test_closed_disables_selection_and_publish(self):
+        set_consent(self.client, self.tokens["甲"], True)
+        self.assertEqual(close_session(self.client, self.host_token).status_code, 200)
+        hs = self.poll()
+        self.assertTrue(hs["closed"])
+        # 封存后授权变更与发布均 409：页面据 closed=true 禁用勾选与发布
+        self.assertEqual(
+            set_consent(self.client, self.tokens["乙"], True).status_code, 409
+        )
+        self.assertEqual(
+            publish_anthology(self.client, self.host_token, ["甲"]).status_code, 409
+        )
+        # 状态不变：仍无合辑，各人授权保持封存时快照
+        hs = self.poll()
+        self.assertIsNone(hs["anthology_url"])
+        self.assertEqual(
+            [r["anthology_consent"] for r in hs["reviewers"]],
+            [True, False, False],
+        )
+
+
 class OldSchemaMigrationTest(unittest.TestCase):
     """旧库启动时自动支持问答、换发、移除、回执、举报与封存存储：补表/补列/回填凭据，旧数据保留。"""
 
@@ -3073,4 +3167,15 @@ class OldSchemaMigrationTest(unittest.TestCase):
 
 
 if __name__ == "__main__":
-    unittest.main(verbosity=2)
+    prog = unittest.main(verbosity=2, exit=False)
+    ok = prog.result.wasSuccessful()
+    # 主持页前端回归（勾选随轮询保留）：本机有 node 时一并执行，
+    # 也可单独运行 node selftest_host.js
+    node = shutil.which("node")
+    script = os.path.join(os.path.dirname(os.path.abspath(__file__)), "selftest_host.js")
+    if node:
+        print("\n--- 主持页前端回归：node selftest_host.js ---", flush=True)
+        ok = subprocess.run([node, script]).returncode == 0 and ok
+    else:
+        print("\n未找到 node，跳过主持页前端回归（可单独运行：node selftest_host.js）")
+    sys.exit(0 if ok else 1)
