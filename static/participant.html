@@ -1,0 +1,131 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>稿件匿名互评 · 参与</title>
+<link rel="stylesheet" href="/static/style.css">
+</head>
+<body>
+<main>
+  <h1>参与互评</h1>
+  <p id="fatal" class="error" hidden></p>
+
+  <div id="content">
+    <p>你好，<strong id="my-name"></strong>。你可以修改自己的稿件、阅读分配给你的稿件并提交意见。页面不显示他人姓名。</p>
+    <p id="published-banner" class="banner" hidden>已公布：稿件与意见均已锁定，你收到的匿名意见见页面底部。</p>
+    <p id="closed-banner" class="banner" hidden>本会话已被主持人永久封存：以下内容仅供只读查阅，所有提交、确认、举报与链接操作均已停用；你的数据与个人链接均保留。</p>
+
+    <section class="card">
+      <h2>我的稿件 <span id="my-version" class="muted"></span></h2>
+      <textarea id="my-manuscript" rows="8"></textarea>
+      <div class="row-actions">
+        <button id="save-manuscript" class="primary">保存稿件</button>
+      </div>
+      <p class="muted">注意：保存新版本后，别人针对旧版本已提交的意见会立即失效。</p>
+      <p id="ms-msg"></p>
+    </section>
+
+    <section class="card">
+      <h2>分配给我评审的稿件 <span id="assignment-version" class="muted"></span></h2>
+      <pre id="assignment" class="manuscript-view"></pre>
+      <p id="assignment-notice" class="pending" hidden>稿件已更新为最新版本，请重新阅读后再提交意见。</p>
+      <div id="assignment-changed" class="clarify" hidden>
+        <p class="pending">原分配成员已退出互评，系统已按原录入顺序把下一位成员的稿件改分配给你。请重新阅读下面这篇稿件，确认后才能提交意见；你已输入的意见文本会保留。</p>
+        <div class="row-actions">
+          <button id="confirm-reread" class="primary" type="button">我已重新阅读，确认评审此稿</button>
+        </div>
+      </div>
+    </section>
+
+    <section class="card">
+      <h2>我的评审意见</h2>
+      <p id="review-status" class="muted"></p>
+      <textarea id="my-review" rows="6" placeholder="针对上面这篇稿件的意见"></textarea>
+      <div class="row-actions">
+        <button id="submit-review" class="primary">提交意见</button>
+      </div>
+      <p class="muted">提交绑定你当前读到的稿件版本；若对方更新了稿件，需重新阅读后再提交。</p>
+      <p id="review-msg"></p>
+
+      <div id="answer-box" class="clarify" hidden>
+        <h3>作者对这条意见的澄清问题</h3>
+        <div id="answer-question" class="clarify-item"></div>
+        <div id="answer-form">
+          <textarea id="answer-input" rows="4" placeholder="对该问题的答复（仅可答复一次，提交后不可修改）"></textarea>
+          <div class="row-actions">
+            <button id="submit-answer" class="primary">提交答复</button>
+          </div>
+          <p id="answer-msg"></p>
+        </div>
+        <div id="answer-done" class="clarify-item" hidden>
+          <strong>我的答复：</strong><span id="answer-text"></span>
+        </div>
+      </div>
+    </section>
+
+    <section id="received-section" class="card" hidden>
+      <h2>我收到的匿名意见</h2>
+      <pre id="received" class="manuscript-view"></pre>
+      <p id="received-blocked-notice" class="pending" hidden>你收到的这条意见已被主持人屏蔽，页面不再显示意见原文；相关问答与已读状态仍保留。</p>
+
+      <div id="report-box" class="clarify">
+        <h3>举报该意见</h3>
+        <p class="muted">如认为收到的意见有问题，可提交一次举报。原因不能为空且不超过 1000 字；提交后不可修改，主持人将选择保留或屏蔽。</p>
+        <div id="report-form">
+          <textarea id="report-input" rows="4" maxlength="1000" placeholder="举报原因（1～1000 字）"></textarea>
+          <div class="row-actions">
+            <button id="submit-report" class="primary" type="button">提交举报</button>
+          </div>
+          <p id="report-msg"></p>
+        </div>
+        <div id="report-done" class="clarify-item" hidden>
+          <p><strong>举报编号：</strong><span id="report-id"></span></p>
+          <p><strong>举报原因：</strong><span id="report-reason"></span></p>
+          <p><strong>处理状态：</strong><span id="report-status"></span></p>
+        </div>
+      </div>
+
+      <div id="ack-box" class="clarify">
+        <h3>确认已读</h3>
+        <p class="muted">阅读后请明确确认收到此意见；仅打开页面、停留或提问不会自动确认。确认后主持台可见你的确认状态与首次确认时间（不含意见内容）。</p>
+        <div id="ack-form">
+          <div class="row-actions">
+            <button id="ack-button" class="primary" type="button">我已阅读，确认收到此意见</button>
+          </div>
+          <p id="ack-msg"></p>
+        </div>
+        <p id="ack-done" class="ok" hidden>已确认收到此意见（首次确认时间：<span id="ack-time"></span>）。</p>
+      </div>
+
+      <div id="question-box" class="clarify">
+        <h3>对该意见提出澄清问题</h3>
+        <p class="muted">公布后可就收到的匿名意见提一次澄清问题，对应评审者将答复一次；每条意见仅一问一答，提交后均不可修改。页面不会显示对方姓名或链接。</p>
+        <div id="question-form">
+          <textarea id="question-input" rows="4" placeholder="针对这条意见的澄清问题（仅可提问一次，提交后不可修改）"></textarea>
+          <div class="row-actions">
+            <button id="submit-question" class="primary">提交问题</button>
+          </div>
+          <p id="question-msg"></p>
+        </div>
+        <div id="question-done" class="clarify-item" hidden>
+          <strong>我的问题：</strong><span id="question-text"></span>
+          <p id="answer-view" class="muted"></p>
+        </div>
+      </div>
+    </section>
+
+    <section id="anthology-section" class="card" hidden>
+      <h2>匿名合辑授权</h2>
+      <p class="muted">主持人可挑选已授权的稿件发布匿名合辑：公开页只按编号展示稿文，不显示姓名等任何信息。你可以随时授权或撤回自己的稿件（初始未授权）；合辑一旦发布，授权即冻结，不能再变更。</p>
+      <p id="anthology-status" class="muted"></p>
+      <div class="row-actions">
+        <button id="anthology-toggle" class="primary" type="button"></button>
+      </div>
+      <p id="anthology-msg"></p>
+    </section>
+  </div>
+</main>
+<script src="/static/participant.js"></script>
+</body>
+</html>

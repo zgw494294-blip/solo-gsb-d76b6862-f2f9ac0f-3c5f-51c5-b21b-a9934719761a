@@ -1,0 +1,85 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>稿件匿名互评 · 主持</title>
+<link rel="stylesheet" href="/static/style.css">
+</head>
+<body>
+<main>
+  <h1>主持台</h1>
+  <p id="fatal" class="error" hidden></p>
+
+  <div id="content">
+    <p id="published-banner" class="banner" hidden>已公布：参与者现在可以看到自己收到的匿名意见，稿件与意见均已锁定。</p>
+    <p id="closed-banner" class="banner" hidden>本会话已永久封存：双方仅可只读查阅，所有写操作均已停用；封存不删除任何数据，主持链接与个人链接继续保留。</p>
+
+    <section id="close-section" class="card" hidden>
+      <h2>封存会话</h2>
+      <p class="muted">公布后，在没有未答复澄清问题、没有待处理举报时，可将本会话永久封存，供双方只读查阅。封存为一次性操作：封存后提问、答复、确认已读、举报与换发链接等一切写入都将被拒绝；数据与链接均保留，匿名、只读查看不受影响。</p>
+      <div class="row-actions">
+        <button id="close-session" class="link-danger" type="button">永久封存本会话</button>
+      </div>
+      <p id="close-error" class="error"></p>
+    </section>
+
+    <section class="card">
+      <h2>互评进度</h2>
+      <p id="pending-summary" class="muted"></p>
+      <table>
+        <thead><tr><th>姓名</th><th>互评意见状态</th><th id="ack-head" hidden>已读回执</th></tr></thead>
+        <tbody id="reviewers"></tbody>
+      </table>
+      <p class="muted" id="ack-note" hidden>已读回执按留存名单原顺序显示：作者在其页面明确确认已读后记为"已确认"并给出首次确认时间；此处不展示意见或问答内容。</p>
+      <div class="row-actions">
+        <button id="publish" class="primary" disabled>全部公布</button>
+      </div>
+      <p class="muted">只有每篇当前稿件都有有效意见时才能公布；公布为一次性操作，公布后稿件与意见均不可再改。</p>
+      <p id="error" class="error"></p>
+    </section>
+
+    <section id="reports-section" class="card" hidden>
+      <h2>意见举报</h2>
+      <table>
+        <thead><tr><th>编号</th><th>举报原因</th><th>意见原文</th><th>处理状态</th><th>操作</th></tr></thead>
+        <tbody id="reports"></tbody>
+      </table>
+      <p class="muted">列表仅显示举报编号、原因、意见原文和处理状态，不显示作者姓名、个人链接或问答。每条举报只能处理一次，保留或屏蔽后均不可修改。</p>
+      <p id="report-decision-error" class="error"></p>
+    </section>
+
+    <section id="anthology-section" class="card" hidden>
+      <h2>匿名合辑</h2>
+      <p class="muted">勾选要收入合辑的稿件（仅已授权的稿件才能发布成功；任一入选稿未授权则整次发布失败）。发布后生成独立的随机公开链接：公开页只按编号展示稿文（编号按原名单顺序），不含姓名、意见、问答等任何其他信息。发布为一次性操作：发布后授权冻结，不能重复发布；会话封存后合辑公开页仍可只读访问。</p>
+      <div id="anthology-form">
+        <table>
+          <thead><tr><th>入选</th><th>姓名</th><th>授权状态</th></tr></thead>
+          <tbody id="anthology-members"></tbody>
+        </table>
+        <div class="row-actions">
+          <button id="anthology-publish" class="primary" type="button">发布匿名合辑</button>
+        </div>
+      </div>
+      <div id="anthology-done" hidden>
+        <p>合辑已发布。公开链接（任何人可读，只含编号与稿文）：<a id="anthology-link" href="#" target="_blank" rel="noopener"></a></p>
+      </div>
+      <p id="anthology-error" class="error"></p>
+    </section>
+
+    <section class="card">
+      <h2>个人链接（分发给对应的人）</h2>
+      <table>
+        <thead><tr><th>姓名</th><th>个人链接</th><th>操作</th></tr></thead>
+        <tbody id="links"></tbody>
+      </table>
+      <p class="muted">个人链接泄露时，可在公布前后为该成员换发链接：换发后原链接立即作废（再使用一律无效），新链接沿用其稿件、版本、意见与问答；其他人的链接不受影响。</p>
+      <p class="muted">公布前还可以移除退出互评的成员：留存成员按原录入顺序重新闭合互评环，移除后至少保留 3 人；不能补人，也不能恢复。退出者的个人链接永久失效，其发出或收到的意见不计入公布条件；只有原来评退出者的人会改评下一位留存成员（旧意见失效，需重新阅读提交），其他人的稿件、版本、意见与链接全部保留。</p>
+      <p id="remove-error" class="error"></p>
+      <p id="rotate-error" class="error"></p>
+    </section>
+  </div>
+</main>
+<script src="/static/host.js"></script>
+</body>
+</html>
